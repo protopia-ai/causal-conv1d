@@ -81,7 +81,7 @@ jobs:
           swap-size-gb: 10
 
       - name: Install CUDA ${{ inputs.cuda-version }}
-        if: ${{ inputs.cuda-version != 'cpu' }}
+        if: ${{ inputs.cuda-version != 'cpu' && !startsWith(inputs.cuda-version, '13.4.') }}
         uses: Jimver/cuda-toolkit@v0.2.35
         id: cuda-toolkit
         with:
@@ -91,6 +91,19 @@ jobs:
           # method: ${{ (inputs.cuda-version == '11.8.0' || inputs.cuda-version == '12.1.0') && 'network' || 'local' }}
           method: "network"
           sub-packages: '["nvcc"]'
+
+      # Jimver/cuda-toolkit has no CUDA 13.4 release yet, so install nvcc from NVIDIA's apt repo instead.
+      - name: Install CUDA ${{ inputs.cuda-version }} from NVIDIA apt repo
+        if: ${{ startsWith(inputs.cuda-version, '13.4.') }}
+        run: |
+          arch=$([ "$(uname -m)" = "aarch64" ] && echo sbsa || echo x86_64)
+          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${arch}/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update -q
+          sudo apt-get install -y -q cuda-nvcc-13-4
+          echo "/usr/local/cuda-13.4/bin" >> $GITHUB_PATH
+          echo "CUDA_PATH=/usr/local/cuda-13.4" >> $GITHUB_ENV
+        shell: bash
 
       - name: Install PyTorch ${{ inputs.torch-version }}+cu${{ inputs.cuda-version }}
         run: |
